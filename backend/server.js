@@ -8,6 +8,8 @@ const profileRoutes = require("./routes/profileRoutes");
 const jobRoutes = require("./routes/jobRoutes");
 const applicationRoutes = require("./routes/applicationRoutes");
 const candidateDataRoutes = require("./routes/candidateDataRoutes");
+const documentRoutes = require("./routes/documentRoutes");
+const errorMiddleware = require("./middleware/errorMiddleware");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -20,6 +22,7 @@ app.use("/api/profiles", profileRoutes);
 app.use("/api/jobs", jobRoutes);
 app.use("/api/applications", applicationRoutes);
 app.use("/api/candidate-data", candidateDataRoutes);
+app.use("/api/documents", documentRoutes);
 
 app.get("/health", (req, res) => {
   res.status(200).json({
@@ -52,6 +55,8 @@ app.use((req, res) => {
     message: "Route not found",
   });
 });
+
+app.use(errorMiddleware);
 
 app.listen(PORT, () => {
   console.log(`TalentNexus AI API running on port ${PORT}`);
