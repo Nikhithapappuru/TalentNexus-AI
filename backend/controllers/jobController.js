@@ -12,6 +12,15 @@ const getRecruiterProfile = async (userId) => {
   return result.rows[0];
 };
 
+const getRecruiterOwnedJob = async (jobId, recruiterId) => {
+  const result = await pool.query(
+    "SELECT id FROM jobs WHERE id = $1 AND created_by = $2",
+    [jobId, recruiterId]
+  );
+
+  return result.rows[0];
+};
+
 const createJob = async (req, res) => {
   try {
     const {
@@ -224,9 +233,122 @@ const getMyJobs = async (req, res) => {
   }
 };
 
+const addJobSkill = async (req, res) => {
+  try {
+    const { name, category, isRequired, weight } = req.body;
+
+    if (!name) {
+      return res.status(400).json({
+        status: "error",
+        message: "Skill name is required",
+      });
+    }
+
+    const recruiterProfile = await getRecruiterProfile(req.user.id);
+
+    if (!recruiterProfile) {
+      return res.status(404).json({
+        status: "error",
+        message: "Recruiter profile not found",
+      });
+    }
+
+    const job = await getRecruiterOwnedJob(req.params.id, recruiterProfile.id);
+
+    if (!job) {
+      return res.status(404).json({
+        status: "error",
+        message: "Job not found for this recruiter",
+      });
+    }
+
+    const normalizedWeight = weight === undefined ? 1 : Number(weight);
+
+    if (Number.isNaN(normalizedWeight) || normalizedWeight < 0) {
+      return res.status(400).json({
+        status: "error",
+        message: "Skill weight must be a valid non-negative number",
+      });
+    }
+
+    const skillResult = await pool.query(
+      `INSERT INTO skills (name, category)
+       VALUES ($1, $2)
+       ON CONFLICT (name)
+       DO UPDATE SET category = COALESCE(EXCLUDED.category, skills.category)
+       RETURNING id, name, category`,
+      [name.trim(), category || null]
+    );
+
+    const skill = skillResult.rows[0];
+
+    const result = await pool.query(
+      `INSERT INTO job_skills (job_id, skill_id, is_required, weight)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (job_id, skill_id)
+       DO UPDATE SET
+          is_required = EXCLUDED.is_required,
+          weight = EXCLUDED.weight
+       RETURNING *`,
+      [
+        req.params.id,
+        skill.id,
+        isRequired === undefined ? true : Boolean(isRequired),
+        normalizedWeight,
+      ]
+    );
+
+    return res.status(201).json({
+      status: "success",
+      skill: {
+        ...result.rows[0],
+        name: skill.name,
+        category: skill.category,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: "error",
+      message: error.message,
+    });
+  }
+};
+
+const getJobSkills = async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT
+          job_skills.id,
+          skills.id AS skill_id,
+          skills.name,
+          skills.category,
+          job_skills.is_required,
+          job_skills.weight
+       FROM job_skills
+       INNER JOIN skills ON skills.id = job_skills.skill_id
+       WHERE job_skills.job_id = $1
+       ORDER BY job_skills.is_required DESC, job_skills.weight DESC, skills.name ASC`,
+      [req.params.id]
+    );
+
+    return res.status(200).json({
+      status: "success",
+      count: result.rows.length,
+      skills: result.rows,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: "error",
+      message: error.message,
+    });
+  }
+};
+
 module.exports = {
   createJob,
   getJobs,
   getJobById,
   getMyJobs,
+  addJobSkill,
+  getJobSkills,
 };
