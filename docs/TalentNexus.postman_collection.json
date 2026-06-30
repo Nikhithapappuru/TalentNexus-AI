@@ -1,0 +1,322 @@
+{
+  "info": {
+    "name": "TalentNexus AI Backend",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5000" },
+    { "key": "candidateToken", "value": "" },
+    { "key": "recruiterToken", "value": "" },
+    { "key": "adminToken", "value": "" },
+    { "key": "jobId", "value": "" },
+    { "key": "applicationId", "value": "" },
+    { "key": "documentId", "value": "" },
+    { "key": "companyId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": { "method": "GET", "url": "{{baseUrl}}/health" }
+        },
+        {
+          "name": "Database Check",
+          "request": { "method": "GET", "url": "{{baseUrl}}/db-check" }
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register Candidate",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"candidate@test.com\",\n  \"password\": \"password123\",\n  \"role\": \"candidate\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/register"
+          }
+        },
+        {
+          "name": "Register Recruiter",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"recruiter@test.com\",\n  \"password\": \"password123\",\n  \"role\": \"recruiter\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/register"
+          }
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"candidate@test.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/login"
+          }
+        },
+        {
+          "name": "Me",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{candidateToken}}" }],
+            "url": "{{baseUrl}}/api/auth/me"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Profiles",
+      "item": [
+        {
+          "name": "Create Candidate Profile",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{candidateToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Test Candidate\",\n  \"phone\": \"9999999999\",\n  \"headline\": \"Full Stack Developer\",\n  \"bio\": \"Building TalentNexus AI\",\n  \"location\": \"India\"\n}"
+            },
+            "url": "{{baseUrl}}/api/profiles/candidate"
+          }
+        },
+        {
+          "name": "Create Company",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{recruiterToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"companyName\": \"TalentNexus Labs\",\n  \"description\": \"AI hiring platform company\",\n  \"website\": \"https://example.com\",\n  \"location\": \"Remote\"\n}"
+            },
+            "url": "{{baseUrl}}/api/profiles/companies"
+          }
+        },
+        {
+          "name": "Create Recruiter Profile",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{recruiterToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Test Recruiter\",\n  \"designation\": \"HR Manager\",\n  \"companyId\": \"{{companyId}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/profiles/recruiter"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Jobs",
+      "item": [
+        {
+          "name": "List Jobs",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/jobs?page=1&limit=10" }
+        },
+        {
+          "name": "Create Job",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{recruiterToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Full Stack Developer Intern\",\n  \"description\": \"React, Node.js, PostgreSQL internship role.\",\n  \"experienceRequired\": 0,\n  \"minimumSalary\": 10000,\n  \"maximumSalary\": 20000,\n  \"employmentType\": \"internship\",\n  \"workMode\": \"remote\",\n  \"location\": \"India\",\n  \"applicationDeadline\": \"2026-12-31\"\n}"
+            },
+            "url": "{{baseUrl}}/api/jobs"
+          }
+        },
+        {
+          "name": "Add Job Skill",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{recruiterToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"React\",\n  \"category\": \"Frontend\",\n  \"isRequired\": true,\n  \"weight\": 1.5\n}"
+            },
+            "url": "{{baseUrl}}/api/jobs/{{jobId}}/skills"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Applications",
+      "item": [
+        {
+          "name": "Apply To Job",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{candidateToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"jobId\": \"{{jobId}}\"\n}" },
+            "url": "{{baseUrl}}/api/applications"
+          }
+        },
+        {
+          "name": "Candidate Applications",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{candidateToken}}" }],
+            "url": "{{baseUrl}}/api/applications/mine"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Documents And RAG",
+      "item": [
+        {
+          "name": "Upload Resume",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{candidateToken}}" }],
+            "body": {
+              "mode": "formdata",
+              "formdata": [{ "key": "file", "type": "file", "src": "" }]
+            },
+            "url": "{{baseUrl}}/api/documents/resume"
+          }
+        },
+        {
+          "name": "Upload Company Document",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{recruiterToken}}" }],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "file", "type": "file", "src": "" },
+                { "key": "documentType", "type": "text", "value": "recruiter_guideline" }
+              ]
+            },
+            "url": "{{baseUrl}}/api/documents/company"
+          }
+        },
+        {
+          "name": "Embed Document Chunks",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{recruiterToken}}" }],
+            "url": "{{baseUrl}}/api/documents/{{documentId}}/chunks/embed"
+          }
+        },
+        {
+          "name": "Semantic Search",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{recruiterToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"What skills are required for this role?\",\n  \"limit\": 5\n}"
+            },
+            "url": "{{baseUrl}}/api/documents/search"
+          }
+        },
+        {
+          "name": "RAG Answer",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{recruiterToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"question\": \"What is the interview process?\",\n  \"limit\": 5\n}"
+            },
+            "url": "{{baseUrl}}/api/documents/answer"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Matching And AI",
+      "item": [
+        {
+          "name": "Candidate Job Match",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{candidateToken}}" }],
+            "url": "{{baseUrl}}/api/matches/jobs/{{jobId}}/me"
+          }
+        },
+        {
+          "name": "Resume Feedback",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{candidateToken}}" }],
+            "url": "{{baseUrl}}/api/ai/resume-feedback"
+          }
+        },
+        {
+          "name": "Skill Gap",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{candidateToken}}" }],
+            "url": "{{baseUrl}}/api/ai/jobs/{{jobId}}/skill-gap"
+          }
+        },
+        {
+          "name": "Job Recommendations",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{candidateToken}}" }],
+            "url": "{{baseUrl}}/api/ai/job-recommendations?limit=10"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "Stats",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": "{{baseUrl}}/api/admin/stats"
+          }
+        },
+        {
+          "name": "Users",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": "{{baseUrl}}/api/admin/users?page=1&limit=20"
+          }
+        }
+      ]
+    }
+  ]
+}
