@@ -1,4 +1,5 @@
 const pool = require("../config/db");
+const { getPagination, getPaginationMeta } = require("../utils/pagination");
 
 const allowedAccountStatuses = ["active", "inactive", "suspended"];
 const allowedVerificationStatuses = ["pending", "verified"];
@@ -30,16 +31,27 @@ const getPlatformStats = async (req, res) => {
 
 const getUsers = async (req, res) => {
   try {
+    const pagination = getPagination(req.query, { limit: 20, maxLimit: 100 });
     const result = await pool.query(
       `SELECT id, email, role, account_status, verification_status,
           last_login, created_at
        FROM users
-       ORDER BY created_at DESC`
+       ORDER BY created_at DESC
+       LIMIT $1
+       OFFSET $2`,
+      [pagination.limit, pagination.offset]
+    );
+    const countResult = await pool.query(
+      "SELECT COUNT(*)::int AS total FROM users"
     );
 
     return res.status(200).json({
       status: "success",
       count: result.rows.length,
+      pagination: getPaginationMeta({
+        ...pagination,
+        total: countResult.rows[0].total,
+      }),
       users: result.rows,
     });
   } catch (error) {
@@ -105,20 +117,31 @@ const updateUserStatus = async (req, res) => {
 
 const getCompanies = async (req, res) => {
   try {
+    const pagination = getPagination(req.query, { limit: 20, maxLimit: 100 });
     const result = await pool.query(
       `SELECT companies.*,
-          COUNT(recruiter_profiles.id)::int AS recruiter_count,
-          COUNT(jobs.id)::int AS job_count
+          COUNT(DISTINCT recruiter_profiles.id)::int AS recruiter_count,
+          COUNT(DISTINCT jobs.id)::int AS job_count
        FROM companies
        LEFT JOIN recruiter_profiles ON recruiter_profiles.company_id = companies.id
        LEFT JOIN jobs ON jobs.company_id = companies.id
        GROUP BY companies.id
-       ORDER BY companies.created_at DESC`
+       ORDER BY companies.created_at DESC
+       LIMIT $1
+       OFFSET $2`,
+      [pagination.limit, pagination.offset]
+    );
+    const countResult = await pool.query(
+      "SELECT COUNT(*)::int AS total FROM companies"
     );
 
     return res.status(200).json({
       status: "success",
       count: result.rows.length,
+      pagination: getPaginationMeta({
+        ...pagination,
+        total: countResult.rows[0].total,
+      }),
       companies: result.rows,
     });
   } catch (error) {

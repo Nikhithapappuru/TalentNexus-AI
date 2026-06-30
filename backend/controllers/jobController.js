@@ -1,4 +1,5 @@
 const pool = require("../config/db");
+const { getPagination, getPaginationMeta } = require("../utils/pagination");
 
 const allowedEmploymentTypes = ["full_time", "internship", "part_time", "contract"];
 const allowedWorkModes = ["onsite", "hybrid", "remote"];
@@ -119,6 +120,7 @@ const createJob = async (req, res) => {
 const getJobs = async (req, res) => {
   try {
     const { employmentType, workMode, location } = req.query;
+    const pagination = getPagination(req.query, { limit: 10, maxLimit: 50 });
     const conditions = [];
     const values = [];
 
@@ -138,6 +140,16 @@ const getJobs = async (req, res) => {
     }
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+    const countResult = await pool.query(
+      `SELECT COUNT(*)::int AS total
+       FROM jobs
+       INNER JOIN companies ON companies.id = jobs.company_id
+       INNER JOIN recruiter_profiles ON recruiter_profiles.id = jobs.created_by
+       ${whereClause}`,
+      values
+    );
+
+    values.push(pagination.limit, pagination.offset);
 
     const result = await pool.query(
       `SELECT
@@ -148,13 +160,19 @@ const getJobs = async (req, res) => {
        INNER JOIN companies ON companies.id = jobs.company_id
        INNER JOIN recruiter_profiles ON recruiter_profiles.id = jobs.created_by
        ${whereClause}
-       ORDER BY jobs.created_at DESC`,
+       ORDER BY jobs.created_at DESC
+       LIMIT $${values.length - 1}
+       OFFSET $${values.length}`,
       values
     );
 
     return res.status(200).json({
       status: "success",
       count: result.rows.length,
+      pagination: getPaginationMeta({
+        ...pagination,
+        total: countResult.rows[0].total,
+      }),
       jobs: result.rows,
     });
   } catch (error) {
@@ -202,6 +220,7 @@ const getJobById = async (req, res) => {
 
 const getMyJobs = async (req, res) => {
   try {
+    const pagination = getPagination(req.query, { limit: 10, maxLimit: 50 });
     const recruiterProfile = await getRecruiterProfile(req.user.id);
 
     if (!recruiterProfile) {
@@ -216,13 +235,23 @@ const getMyJobs = async (req, res) => {
        FROM jobs
        INNER JOIN companies ON companies.id = jobs.company_id
        WHERE jobs.created_by = $1
-       ORDER BY jobs.created_at DESC`,
+       ORDER BY jobs.created_at DESC
+       LIMIT $2
+       OFFSET $3`,
+      [recruiterProfile.id, pagination.limit, pagination.offset]
+    );
+    const countResult = await pool.query(
+      "SELECT COUNT(*)::int AS total FROM jobs WHERE created_by = $1",
       [recruiterProfile.id]
     );
 
     return res.status(200).json({
       status: "success",
       count: result.rows.length,
+      pagination: getPaginationMeta({
+        ...pagination,
+        total: countResult.rows[0].total,
+      }),
       jobs: result.rows,
     });
   } catch (error) {
