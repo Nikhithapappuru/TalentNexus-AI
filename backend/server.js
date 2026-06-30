@@ -9,6 +9,9 @@ const jobRoutes = require("./routes/jobRoutes");
 const applicationRoutes = require("./routes/applicationRoutes");
 const candidateDataRoutes = require("./routes/candidateDataRoutes");
 const documentRoutes = require("./routes/documentRoutes");
+const matchRoutes = require("./routes/matchRoutes");
+const aiRoutes = require("./routes/aiRoutes");
+const adminRoutes = require("./routes/adminRoutes");
 const errorMiddleware = require("./middleware/errorMiddleware");
 
 const app = express();
@@ -23,6 +26,9 @@ app.use("/api/jobs", jobRoutes);
 app.use("/api/applications", applicationRoutes);
 app.use("/api/candidate-data", candidateDataRoutes);
 app.use("/api/documents", documentRoutes);
+app.use("/api/matches", matchRoutes);
+app.use("/api/ai", aiRoutes);
+app.use("/api/admin", adminRoutes);
 
 app.get("/health", (req, res) => {
   res.status(200).json({
