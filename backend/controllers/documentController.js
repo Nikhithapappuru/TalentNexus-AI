@@ -2,6 +2,12 @@ const fs = require("fs/promises");
 const { PDFParse } = require("pdf-parse");
 const pool = require("../config/db");
 const chunkText = require("../utils/textChunker");
+const {
+  EMBEDDING_MODEL,
+  EMBEDDING_DIMENSIONS,
+  embedTexts,
+  toPgVector,
+} = require("../services/embeddingService");
 
 const recruiterDocumentTypes = [
   "job_description",
@@ -303,6 +309,150 @@ const regenerateDocumentChunks = async (req, res) => {
   }
 };
 
+const embedDocumentChunks = async (req, res) => {
+  try {
+    const document = await pool.query(
+      "SELECT id FROM documents WHERE id = $1 AND owner_user_id = $2",
+      [req.params.id, req.user.id]
+    );
+
+    if (document.rows.length === 0) {
+      return res.status(404).json({
+        status: "error",
+        message: "Document not found",
+      });
+    }
+
+    const chunks = await pool.query(
+      `SELECT id, content
+       FROM document_chunks
+       WHERE document_id = $1
+       ORDER BY chunk_index ASC`,
+      [req.params.id]
+    );
+
+    if (chunks.rows.length === 0) {
+      return res.status(400).json({
+        status: "error",
+        message: "No chunks found for this document",
+      });
+    }
+
+    const embeddings = await embedTexts(
+      chunks.rows.map((chunk) => chunk.content),
+      "RETRIEVAL_DOCUMENT"
+    );
+
+    if (embeddings.length !== chunks.rows.length) {
+      return res.status(502).json({
+        status: "error",
+        message: "Embedding provider returned an unexpected number of vectors",
+      });
+    }
+
+    for (const [index, chunk] of chunks.rows.entries()) {
+      await pool.query(
+        "UPDATE document_chunks SET embedding = $1::vector WHERE id = $2",
+        [toPgVector(embeddings[index]), chunk.id]
+      );
+    }
+
+    return res.status(200).json({
+      status: "success",
+      embeddedChunkCount: embeddings.length,
+      model: EMBEDDING_MODEL,
+      dimensions: EMBEDDING_DIMENSIONS,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: "error",
+      message: error.message,
+    });
+  }
+};
+
+const searchDocumentChunks = async (req, res) => {
+  try {
+    const { query, limit = 5, companyId } = req.body;
+
+    if (!query) {
+      return res.status(400).json({
+        status: "error",
+        message: "Search query is required",
+      });
+    }
+
+    const normalizedLimit = Math.min(Math.max(Number(limit) || 5, 1), 10);
+    const [queryEmbedding] = await embedTexts([query], "RETRIEVAL_QUERY");
+
+    if (!queryEmbedding || queryEmbedding.length === 0) {
+      return res.status(502).json({
+        status: "error",
+        message: "Embedding provider did not return a query vector",
+      });
+    }
+
+    const conditions = ["document_chunks.embedding IS NOT NULL"];
+    const values = [toPgVector(queryEmbedding), normalizedLimit];
+
+    if (req.user.role === "recruiter") {
+      const recruiterProfile = await pool.query(
+        "SELECT company_id FROM recruiter_profiles WHERE user_id = $1",
+        [req.user.id]
+      );
+
+      if (
+        recruiterProfile.rows.length === 0 ||
+        !recruiterProfile.rows[0].company_id
+      ) {
+        return res.status(400).json({
+          status: "error",
+          message: "Recruiter profile must be linked to a company",
+        });
+      }
+
+      values.push(recruiterProfile.rows[0].company_id);
+      conditions.push(`documents.company_id = $${values.length}`);
+    } else if (companyId) {
+      values.push(companyId);
+      conditions.push(`documents.company_id = $${values.length}`);
+    } else {
+      conditions.push("(documents.owner_user_id = $3 OR documents.company_id IS NOT NULL)");
+      values.push(req.user.id);
+    }
+
+    const result = await pool.query(
+      `SELECT
+          document_chunks.id,
+          document_chunks.document_id,
+          document_chunks.chunk_index,
+          document_chunks.content,
+          document_chunks.token_count,
+          documents.document_type,
+          documents.original_filename,
+          documents.company_id,
+          1 - (document_chunks.embedding <=> $1::vector) AS similarity
+       FROM document_chunks
+       INNER JOIN documents ON documents.id = document_chunks.document_id
+       WHERE ${conditions.join(" AND ")}
+       ORDER BY document_chunks.embedding <=> $1::vector
+       LIMIT $2`,
+      values
+    );
+
+    return res.status(200).json({
+      status: "success",
+      count: result.rows.length,
+      results: result.rows,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: "error",
+      message: error.message,
+    });
+  }
+};
+
 module.exports = {
   uploadResume,
   uploadCompanyDocument,
@@ -310,4 +460,6 @@ module.exports = {
   getDocumentById,
   getDocumentChunks,
   regenerateDocumentChunks,
+  embedDocumentChunks,
+  searchDocumentChunks,
 };
