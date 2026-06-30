@@ -1,23 +1,7 @@
-const { GoogleGenAI } = require("@google/genai");
+const getGeminiClient = require("./geminiClient");
 
 const EMBEDDING_MODEL = process.env.GEMINI_EMBEDDING_MODEL || "text-embedding-004";
 const EMBEDDING_DIMENSIONS = Number(process.env.EMBEDDING_DIMENSIONS || 768);
-
-let client;
-
-const getClient = () => {
-  if (!process.env.GEMINI_API_KEY) {
-    throw new Error("GEMINI_API_KEY is not configured");
-  }
-
-  if (!client) {
-    client = new GoogleGenAI({
-      apiKey: process.env.GEMINI_API_KEY,
-    });
-  }
-
-  return client;
-};
 
 const embedTexts = async (texts, taskType = "RETRIEVAL_DOCUMENT") => {
   const cleanTexts = texts.map((text) => text || "");
@@ -26,7 +10,7 @@ const embedTexts = async (texts, taskType = "RETRIEVAL_DOCUMENT") => {
     return [];
   }
 
-  const response = await getClient().models.embedContent({
+  const response = await getGeminiClient().models.embedContent({
     model: EMBEDDING_MODEL,
     contents: cleanTexts,
     config: {

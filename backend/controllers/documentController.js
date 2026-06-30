@@ -8,6 +8,10 @@ const {
   embedTexts,
   toPgVector,
 } = require("../services/embeddingService");
+const {
+  GENERATION_MODEL,
+  generateGroundedAnswer,
+} = require("../services/generationService");
 
 const recruiterDocumentTypes = [
   "job_description",
@@ -453,6 +457,111 @@ const searchDocumentChunks = async (req, res) => {
   }
 };
 
+const answerFromDocuments = async (req, res) => {
+  try {
+    const { question, limit = 5, companyId } = req.body;
+
+    if (!question) {
+      return res.status(400).json({
+        status: "error",
+        message: "Question is required",
+      });
+    }
+
+    const normalizedLimit = Math.min(Math.max(Number(limit) || 5, 1), 10);
+    const [queryEmbedding] = await embedTexts([question], "RETRIEVAL_QUERY");
+
+    if (!queryEmbedding || queryEmbedding.length === 0) {
+      return res.status(502).json({
+        status: "error",
+        message: "Embedding provider did not return a query vector",
+      });
+    }
+
+    const conditions = ["document_chunks.embedding IS NOT NULL"];
+    const values = [toPgVector(queryEmbedding), normalizedLimit];
+
+    if (req.user.role === "recruiter") {
+      const recruiterProfile = await pool.query(
+        "SELECT company_id FROM recruiter_profiles WHERE user_id = $1",
+        [req.user.id]
+      );
+
+      if (
+        recruiterProfile.rows.length === 0 ||
+        !recruiterProfile.rows[0].company_id
+      ) {
+        return res.status(400).json({
+          status: "error",
+          message: "Recruiter profile must be linked to a company",
+        });
+      }
+
+      values.push(recruiterProfile.rows[0].company_id);
+      conditions.push(`documents.company_id = $${values.length}`);
+    } else if (companyId) {
+      values.push(companyId);
+      conditions.push(`documents.company_id = $${values.length}`);
+    } else {
+      values.push(req.user.id);
+      conditions.push(`documents.owner_user_id = $${values.length}`);
+    }
+
+    const retrieved = await pool.query(
+      `SELECT
+          document_chunks.id,
+          document_chunks.document_id,
+          document_chunks.chunk_index,
+          document_chunks.content,
+          document_chunks.token_count,
+          documents.document_type,
+          documents.original_filename,
+          documents.company_id,
+          1 - (document_chunks.embedding <=> $1::vector) AS similarity
+       FROM document_chunks
+       INNER JOIN documents ON documents.id = document_chunks.document_id
+       WHERE ${conditions.join(" AND ")}
+       ORDER BY document_chunks.embedding <=> $1::vector
+       LIMIT $2`,
+      values
+    );
+
+    if (retrieved.rows.length === 0) {
+      return res.status(404).json({
+        status: "error",
+        message: "No embedded document chunks found for this question",
+      });
+    }
+
+    const answer = await generateGroundedAnswer({
+      question,
+      chunks: retrieved.rows,
+    });
+
+    return res.status(200).json({
+      status: "success",
+      answer,
+      sources: retrieved.rows.map((chunk, index) => ({
+        sourceNumber: index + 1,
+        documentId: chunk.document_id,
+        documentName: chunk.original_filename,
+        documentType: chunk.document_type,
+        chunkIndex: chunk.chunk_index,
+        similarity: chunk.similarity,
+      })),
+      models: {
+        generation: GENERATION_MODEL,
+        embedding: EMBEDDING_MODEL,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: "error",
+      message: error.message,
+    });
+  }
+};
+
 module.exports = {
   uploadResume,
   uploadCompanyDocument,
@@ -462,4 +571,5 @@ module.exports = {
   regenerateDocumentChunks,
   embedDocumentChunks,
   searchDocumentChunks,
+  answerFromDocuments,
 };

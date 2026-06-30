@@ -8,6 +8,7 @@ const {
   regenerateDocumentChunks,
   embedDocumentChunks,
   searchDocumentChunks,
+  answerFromDocuments,
 } = require("../controllers/documentController");
 const protect = require("../middleware/authMiddleware");
 const authorizeRoles = require("../middleware/roleMiddleware");
@@ -33,6 +34,7 @@ router.post(
 );
 router.get("/mine", getMyDocuments);
 router.post("/search", searchDocumentChunks);
+router.post("/answer", answerFromDocuments);
 router.get("/:id/chunks", getDocumentChunks);
 router.post("/:id/chunks/regenerate", regenerateDocumentChunks);
 router.post("/:id/chunks/embed", embedDocumentChunks);
