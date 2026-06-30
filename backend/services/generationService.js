@@ -2,6 +2,15 @@ const getGeminiClient = require("./geminiClient");
 
 const GENERATION_MODEL = process.env.GEMINI_GENERATION_MODEL || "gemini-2.0-flash";
 
+const generateText = async (prompt) => {
+  const response = await getGeminiClient().models.generateContent({
+    model: GENERATION_MODEL,
+    contents: prompt,
+  });
+
+  return response.text || "";
+};
+
 const generateGroundedAnswer = async ({ question, chunks }) => {
   if (!question) {
     throw new Error("Question is required");
@@ -26,15 +35,11 @@ ${context}
 Question:
 ${question}`;
 
-  const response = await getGeminiClient().models.generateContent({
-    model: GENERATION_MODEL,
-    contents: prompt,
-  });
-
-  return response.text || "";
+  return generateText(prompt);
 };
 
 module.exports = {
   GENERATION_MODEL,
+  generateText,
   generateGroundedAnswer,
 };
