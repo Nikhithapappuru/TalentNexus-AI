@@ -7,6 +7,10 @@ const {
 } = require("../controllers/adminController");
 const protect = require("../middleware/authMiddleware");
 const authorizeRoles = require("../middleware/roleMiddleware");
+const {
+  validateEnumBody,
+  validateUuidParam,
+} = require("../middleware/validateRequest");
 
 const router = express.Router();
 
@@ -14,7 +18,13 @@ router.use(protect, authorizeRoles("admin"));
 
 router.get("/stats", getPlatformStats);
 router.get("/users", getUsers);
-router.patch("/users/:userId/status", updateUserStatus);
+router.patch(
+  "/users/:userId/status",
+  validateUuidParam("userId"),
+  validateEnumBody("accountStatus", ["active", "inactive", "suspended"]),
+  validateEnumBody("verificationStatus", ["pending", "verified"]),
+  updateUserStatus
+);
 router.get("/companies", getCompanies);
 
 module.exports = router;
