@@ -412,6 +412,38 @@ h3 {
   gap: 8px;
 }
 
+.recommendation-list {
+  display: grid;
+  gap: 8px;
+}
+
+.recommendation-list article {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid #d7e3dd;
+  border-radius: 8px;
+  background: #fff;
+  padding: 10px;
+}
+
+.recommendation-list p {
+  margin: 4px 0 0;
+  color: #61716c;
+  font-size: 14px;
+}
+
+.recommendation-list span {
+  min-width: 58px;
+  border-radius: 999px;
+  background: #e8f1ed;
+  color: #255f55;
+  padding: 6px 10px;
+  text-align: center;
+  font-weight: 800;
+}
+
 .score-panel {
   display: grid;
   gap: 8px;
@@ -442,6 +474,28 @@ h3 {
   margin: 0;
   color: #43524d;
   line-height: 1.5;
+}
+
+.guidance-panel {
+  display: grid;
+  gap: 10px;
+}
+
+.guidance-panel > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.guidance-panel span {
+  color: #52635e;
+  font-weight: 800;
+}
+
+.guidance-panel strong {
+  color: #1e5a4f;
+  font-size: 22px;
 }
 
 .feedback-box {
@@ -494,8 +548,10 @@ h3 {
   }
 
   .job-list article,
+  .recommendation-list article,
   .job-actions,
-  .score-panel div {
+  .score-panel div,
+  .guidance-panel > div {
     align-items: stretch;
     flex-direction: column;
   }

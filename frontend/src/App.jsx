@@ -87,7 +87,9 @@ function CandidateDashboard({ setMessage }) {
   const [jobs, setJobs] = useState([])
   const [applications, setApplications] = useState([])
   const [documents, setDocuments] = useState([])
+  const [recommendations, setRecommendations] = useState([])
   const [selectedMatch, setSelectedMatch] = useState(null)
+  const [selectedSkillGap, setSelectedSkillGap] = useState(null)
   const [selectedResumeFile, setSelectedResumeFile] = useState(null)
   const [resumeFeedback, setResumeFeedback] = useState('')
   const [profileForm, setProfileForm] = useState(emptyCandidateProfile)
@@ -96,6 +98,8 @@ function CandidateDashboard({ setMessage }) {
   const [isLoading, setIsLoading] = useState(false)
   const [isUploadingResume, setIsUploadingResume] = useState(false)
   const [isGeneratingFeedback, setIsGeneratingFeedback] = useState(false)
+  const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(false)
+  const [isGeneratingGap, setIsGeneratingGap] = useState(false)
 
   const appliedJobIds = useMemo(
     () => new Set(applications.map((application) => application.job_id || application.jobId)),
@@ -291,6 +295,37 @@ function CandidateDashboard({ setMessage }) {
       setMessage(error.response?.data?.message || 'Could not generate resume feedback.')
     } finally {
       setIsGeneratingFeedback(false)
+    }
+  }
+
+  const getRecommendations = async () => {
+    setMessage('')
+    setIsLoadingRecommendations(true)
+
+    try {
+      const { data } = await api.get('/api/ai/job-recommendations?limit=5')
+      setRecommendations(data.recommendations || [])
+      setMessage('Job recommendations loaded.')
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Could not load job recommendations.')
+    } finally {
+      setIsLoadingRecommendations(false)
+    }
+  }
+
+  const getSkillGap = async (jobId) => {
+    setMessage('')
+    setSelectedSkillGap(null)
+    setIsGeneratingGap(true)
+
+    try {
+      const { data } = await api.get(`/api/ai/jobs/${jobId}/skill-gap`)
+      setSelectedSkillGap(data)
+      setMessage('Skill gap guidance generated.')
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Could not generate skill gap guidance.')
+    } finally {
+      setIsGeneratingGap(false)
     }
   }
 
@@ -521,7 +556,32 @@ function CandidateDashboard({ setMessage }) {
             <p className="eyebrow">Opportunities</p>
             <h3>Open jobs</h3>
           </div>
+          <button
+            className="secondary-button compact"
+            type="button"
+            onClick={getRecommendations}
+            disabled={isLoadingRecommendations}
+          >
+            {isLoadingRecommendations ? 'Loading' : 'Recommend jobs'}
+          </button>
         </div>
+
+        {recommendations.length ? (
+          <div className="recommendation-list">
+            {recommendations.map((recommendation) => (
+              <article key={recommendation.job.id}>
+                <div>
+                  <strong>{recommendation.job.title}</strong>
+                  <p>
+                    {recommendation.job.company_name || 'Company'} -{' '}
+                    {recommendation.job.employment_type} - {recommendation.job.work_mode}
+                  </p>
+                </div>
+                <span>{Math.round(Number(recommendation.match?.score || 0))}%</span>
+              </article>
+            ))}
+          </div>
+        ) : null}
 
         {jobs.length === 0 ? (
           <p className="muted">No open jobs found yet.</p>
@@ -545,6 +605,14 @@ function CandidateDashboard({ setMessage }) {
                       onClick={() => viewMatch(job.id)}
                     >
                       View match
+                    </button>
+                    <button
+                      className="secondary-button compact"
+                      type="button"
+                      disabled={isGeneratingGap}
+                      onClick={() => getSkillGap(job.id)}
+                    >
+                      Skill gap
                     </button>
                     <button
                       className="primary-button compact"
@@ -578,6 +646,16 @@ function CandidateDashboard({ setMessage }) {
                 <b>Gaps:</b> {selectedMatch.missingSkills.join(', ')}
               </p>
             ) : null}
+          </div>
+        ) : null}
+
+        {selectedSkillGap ? (
+          <div className="guidance-panel">
+            <div>
+              <span>Skill gap guidance</span>
+              <strong>{Math.round(Number(selectedSkillGap.match?.score || 0))}%</strong>
+            </div>
+            <pre className="feedback-box">{selectedSkillGap.guidance}</pre>
           </div>
         ) : null}
       </div>
