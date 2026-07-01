@@ -211,6 +211,11 @@ select:focus {
   padding: 8px 12px;
 }
 
+.primary-button.compact {
+  min-height: 36px;
+  padding: 8px 12px;
+}
+
 .form-message {
   margin: 14px 0 0;
   color: #4f5d59;
@@ -322,6 +327,15 @@ h3 {
   gap: 12px;
 }
 
+.job-browser {
+  display: grid;
+  gap: 12px;
+  border: 1px solid #d9e1dc;
+  border-radius: 8px;
+  background: #f9fbf8;
+  padding: 14px;
+}
+
 .muted {
   margin: 0;
   color: #697672;
@@ -368,6 +382,52 @@ h3 {
   line-height: 1.45;
 }
 
+.job-list article {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.job-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.score-panel {
+  display: grid;
+  gap: 8px;
+  border: 1px solid #bfd7cf;
+  border-radius: 8px;
+  background: #eef7f3;
+  padding: 12px;
+}
+
+.score-panel div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.score-panel span {
+  color: #52635e;
+  font-weight: 800;
+}
+
+.score-panel strong {
+  color: #1e5a4f;
+  font-size: 24px;
+}
+
+.score-panel p {
+  margin: 0;
+  color: #43524d;
+  line-height: 1.5;
+}
+
 @media (max-width: 820px) {
   .app-shell {
     padding: 18px;
@@ -401,5 +461,17 @@ h3 {
 
   .dashboard-header {
     flex-direction: column;
+  }
+
+  .job-list article,
+  .job-actions,
+  .score-panel div {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .job-actions .primary-button,
+  .job-actions .secondary-button {
+    width: 100%;
   }
 }

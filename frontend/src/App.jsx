@@ -84,19 +84,30 @@ function CandidateDashboard({ setMessage }) {
   const [profile, setProfile] = useState(null)
   const [skills, setSkills] = useState([])
   const [projects, setProjects] = useState([])
+  const [jobs, setJobs] = useState([])
+  const [applications, setApplications] = useState([])
+  const [selectedMatch, setSelectedMatch] = useState(null)
   const [profileForm, setProfileForm] = useState(emptyCandidateProfile)
   const [skillForm, setSkillForm] = useState(emptySkill)
   const [projectForm, setProjectForm] = useState(emptyProject)
   const [isLoading, setIsLoading] = useState(false)
 
+  const appliedJobIds = useMemo(
+    () => new Set(applications.map((application) => application.job_id || application.jobId)),
+    [applications],
+  )
+
   const loadCandidateData = async () => {
     setIsLoading(true)
 
     try {
-      const [profileResult, skillsResult, projectsResult] = await Promise.allSettled([
+      const [profileResult, skillsResult, projectsResult, jobsResult, applicationsResult] =
+        await Promise.allSettled([
         api.get('/api/profiles/candidate/me'),
         api.get('/api/candidate-data/skills'),
         api.get('/api/candidate-data/projects'),
+        api.get('/api/jobs?page=1&limit=8'),
+        api.get('/api/applications/mine'),
       ])
 
       if (profileResult.status === 'fulfilled') {
@@ -109,6 +120,14 @@ function CandidateDashboard({ setMessage }) {
 
       if (projectsResult.status === 'fulfilled') {
         setProjects(projectsResult.value.data.projects)
+      }
+
+      if (jobsResult.status === 'fulfilled') {
+        setJobs(jobsResult.value.data.jobs || [])
+      }
+
+      if (applicationsResult.status === 'fulfilled') {
+        setApplications(applicationsResult.value.data.applications || [])
       }
     } finally {
       setIsLoading(false)
@@ -189,6 +208,30 @@ function CandidateDashboard({ setMessage }) {
       setMessage('Project added.')
     } catch (error) {
       setMessage(error.response?.data?.message || 'Could not add project.')
+    }
+  }
+
+  const applyToJob = async (jobId) => {
+    setMessage('')
+
+    try {
+      await api.post('/api/applications', { jobId })
+      await loadCandidateData()
+      setMessage('Application submitted.')
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Could not submit application.')
+    }
+  }
+
+  const viewMatch = async (jobId) => {
+    setMessage('')
+    setSelectedMatch(null)
+
+    try {
+      const { data } = await api.get(`/api/matches/jobs/${jobId}/me`)
+      setSelectedMatch(data.match || data)
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Could not calculate match yet.')
     }
   }
 
@@ -362,6 +405,73 @@ function CandidateDashboard({ setMessage }) {
             </div>
           )}
         </div>
+      </div>
+
+      <div className="job-browser">
+        <div className="dashboard-header">
+          <div>
+            <p className="eyebrow">Opportunities</p>
+            <h3>Open jobs</h3>
+          </div>
+        </div>
+
+        {jobs.length === 0 ? (
+          <p className="muted">No open jobs found yet.</p>
+        ) : (
+          <div className="record-list job-list">
+            {jobs.map((job) => {
+              const hasApplied = appliedJobIds.has(job.id)
+
+              return (
+                <article key={job.id}>
+                  <div>
+                    <strong>{job.title}</strong>
+                    <p>
+                      {job.company_name || 'Company'} · {job.employment_type} · {job.work_mode}
+                    </p>
+                  </div>
+                  <div className="job-actions">
+                    <button
+                      className="secondary-button compact"
+                      type="button"
+                      onClick={() => viewMatch(job.id)}
+                    >
+                      View match
+                    </button>
+                    <button
+                      className="primary-button compact"
+                      type="button"
+                      disabled={hasApplied}
+                      onClick={() => applyToJob(job.id)}
+                    >
+                      {hasApplied ? 'Applied' : 'Apply'}
+                    </button>
+                  </div>
+                </article>
+              )
+            })}
+          </div>
+        )}
+
+        {selectedMatch ? (
+          <div className="score-panel">
+            <div>
+              <span>Match score</span>
+              <strong>{Math.round(Number(selectedMatch.score || 0))}%</strong>
+            </div>
+            <p>{selectedMatch.explanation || 'Match explanation is not available yet.'}</p>
+            {selectedMatch.matchedSkills?.length ? (
+              <p>
+                <b>Matched:</b> {selectedMatch.matchedSkills.join(', ')}
+              </p>
+            ) : null}
+            {selectedMatch.missingSkills?.length ? (
+              <p>
+                <b>Gaps:</b> {selectedMatch.missingSkills.join(', ')}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </section>
   )
