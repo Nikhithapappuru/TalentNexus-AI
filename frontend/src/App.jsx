@@ -86,11 +86,16 @@ function CandidateDashboard({ setMessage }) {
   const [projects, setProjects] = useState([])
   const [jobs, setJobs] = useState([])
   const [applications, setApplications] = useState([])
+  const [documents, setDocuments] = useState([])
   const [selectedMatch, setSelectedMatch] = useState(null)
+  const [selectedResumeFile, setSelectedResumeFile] = useState(null)
+  const [resumeFeedback, setResumeFeedback] = useState('')
   const [profileForm, setProfileForm] = useState(emptyCandidateProfile)
   const [skillForm, setSkillForm] = useState(emptySkill)
   const [projectForm, setProjectForm] = useState(emptyProject)
   const [isLoading, setIsLoading] = useState(false)
+  const [isUploadingResume, setIsUploadingResume] = useState(false)
+  const [isGeneratingFeedback, setIsGeneratingFeedback] = useState(false)
 
   const appliedJobIds = useMemo(
     () => new Set(applications.map((application) => application.job_id || application.jobId)),
@@ -101,14 +106,22 @@ function CandidateDashboard({ setMessage }) {
     setIsLoading(true)
 
     try {
-      const [profileResult, skillsResult, projectsResult, jobsResult, applicationsResult] =
+      const [
+        profileResult,
+        skillsResult,
+        projectsResult,
+        jobsResult,
+        applicationsResult,
+        documentsResult,
+      ] =
         await Promise.allSettled([
-        api.get('/api/profiles/candidate/me'),
-        api.get('/api/candidate-data/skills'),
-        api.get('/api/candidate-data/projects'),
-        api.get('/api/jobs?page=1&limit=8'),
-        api.get('/api/applications/mine'),
-      ])
+          api.get('/api/profiles/candidate/me'),
+          api.get('/api/candidate-data/skills'),
+          api.get('/api/candidate-data/projects'),
+          api.get('/api/jobs?page=1&limit=8'),
+          api.get('/api/applications/mine'),
+          api.get('/api/documents/mine'),
+        ])
 
       if (profileResult.status === 'fulfilled') {
         setProfile(profileResult.value.data.profile)
@@ -128,6 +141,10 @@ function CandidateDashboard({ setMessage }) {
 
       if (applicationsResult.status === 'fulfilled') {
         setApplications(applicationsResult.value.data.applications || [])
+      }
+
+      if (documentsResult.status === 'fulfilled') {
+        setDocuments(documentsResult.value.data.documents || [])
       }
     } finally {
       setIsLoading(false)
@@ -232,6 +249,48 @@ function CandidateDashboard({ setMessage }) {
       setSelectedMatch(data.match || data)
     } catch (error) {
       setMessage(error.response?.data?.message || 'Could not calculate match yet.')
+    }
+  }
+
+  const uploadResume = async (event) => {
+    event.preventDefault()
+    setMessage('')
+
+    if (!selectedResumeFile) {
+      setMessage('Choose a resume file first.')
+      return
+    }
+
+    const formData = new FormData()
+    formData.append('file', selectedResumeFile)
+    setIsUploadingResume(true)
+
+    try {
+      const { data } = await api.post('/api/documents/resume', formData)
+      setSelectedResumeFile(null)
+      setResumeFeedback('')
+      await loadCandidateData()
+      setMessage(`Resume uploaded. ${data.chunkCount || 0} text chunks created.`)
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Could not upload resume.')
+    } finally {
+      setIsUploadingResume(false)
+    }
+  }
+
+  const getResumeFeedback = async () => {
+    setMessage('')
+    setResumeFeedback('')
+    setIsGeneratingFeedback(true)
+
+    try {
+      const { data } = await api.get('/api/ai/resume-feedback')
+      setResumeFeedback(data.feedback)
+      setMessage('Resume feedback generated.')
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Could not generate resume feedback.')
+    } finally {
+      setIsGeneratingFeedback(false)
     }
   }
 
@@ -407,6 +466,55 @@ function CandidateDashboard({ setMessage }) {
         </div>
       </div>
 
+      <div className="document-panel">
+        <div className="dashboard-header">
+          <div>
+            <p className="eyebrow">Resume intelligence</p>
+            <h3>Upload and improve your resume</h3>
+          </div>
+          <button
+            className="secondary-button compact"
+            type="button"
+            onClick={getResumeFeedback}
+            disabled={isGeneratingFeedback}
+          >
+            {isGeneratingFeedback ? 'Generating' : 'Get feedback'}
+          </button>
+        </div>
+
+        <form className="upload-row" onSubmit={uploadResume}>
+          <input
+            type="file"
+            accept=".pdf,.txt,.doc,.docx"
+            onChange={(event) => setSelectedResumeFile(event.target.files?.[0] || null)}
+          />
+          <button
+            className="primary-button compact"
+            type="submit"
+            disabled={isUploadingResume || !selectedResumeFile}
+          >
+            {isUploadingResume ? 'Uploading' : 'Upload resume'}
+          </button>
+        </form>
+
+        {documents.length === 0 ? (
+          <p className="muted">No documents uploaded yet.</p>
+        ) : (
+          <div className="record-list">
+            {documents.slice(0, 4).map((document) => (
+              <article key={document.id}>
+                <strong>{document.original_filename}</strong>
+                <p>
+                  {document.document_type} - {Math.round((document.file_size_bytes || 0) / 1024)} KB
+                </p>
+              </article>
+            ))}
+          </div>
+        )}
+
+        {resumeFeedback ? <pre className="feedback-box">{resumeFeedback}</pre> : null}
+      </div>
+
       <div className="job-browser">
         <div className="dashboard-header">
           <div>
@@ -427,7 +535,7 @@ function CandidateDashboard({ setMessage }) {
                   <div>
                     <strong>{job.title}</strong>
                     <p>
-                      {job.company_name || 'Company'} · {job.employment_type} · {job.work_mode}
+                      {job.company_name || 'Company'} - {job.employment_type} - {job.work_mode}
                     </p>
                   </div>
                   <div className="job-actions">
