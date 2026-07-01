@@ -26,6 +26,314 @@ const workspaceCopy = {
   },
 }
 
+const emptyCandidateProfile = {
+  fullName: '',
+  phone: '',
+  headline: '',
+  bio: '',
+  location: '',
+}
+
+const emptySkill = {
+  name: '',
+  category: '',
+  proficiencyLevel: '',
+  yearsOfExperience: '',
+}
+
+const emptyProject = {
+  title: '',
+  description: '',
+  techStack: '',
+}
+
+function CandidateDashboard({ setMessage }) {
+  const [profile, setProfile] = useState(null)
+  const [skills, setSkills] = useState([])
+  const [projects, setProjects] = useState([])
+  const [profileForm, setProfileForm] = useState(emptyCandidateProfile)
+  const [skillForm, setSkillForm] = useState(emptySkill)
+  const [projectForm, setProjectForm] = useState(emptyProject)
+  const [isLoading, setIsLoading] = useState(false)
+
+  const loadCandidateData = async () => {
+    setIsLoading(true)
+
+    try {
+      const [profileResult, skillsResult, projectsResult] = await Promise.allSettled([
+        api.get('/api/profiles/candidate/me'),
+        api.get('/api/candidate-data/skills'),
+        api.get('/api/candidate-data/projects'),
+      ])
+
+      if (profileResult.status === 'fulfilled') {
+        setProfile(profileResult.value.data.profile)
+      }
+
+      if (skillsResult.status === 'fulfilled') {
+        setSkills(skillsResult.value.data.skills)
+      }
+
+      if (projectsResult.status === 'fulfilled') {
+        setProjects(projectsResult.value.data.projects)
+      }
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadCandidateData()
+  }, [])
+
+  const updateProfileForm = (event) => {
+    setProfileForm((current) => ({
+      ...current,
+      [event.target.name]: event.target.value,
+    }))
+  }
+
+  const updateSkillForm = (event) => {
+    setSkillForm((current) => ({
+      ...current,
+      [event.target.name]: event.target.value,
+    }))
+  }
+
+  const updateProjectForm = (event) => {
+    setProjectForm((current) => ({
+      ...current,
+      [event.target.name]: event.target.value,
+    }))
+  }
+
+  const submitProfile = async (event) => {
+    event.preventDefault()
+    setMessage('')
+
+    try {
+      const { data } = await api.post('/api/profiles/candidate', profileForm)
+      setProfile(data.profile)
+      setMessage('Candidate profile saved.')
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Could not save profile.')
+    }
+  }
+
+  const submitSkill = async (event) => {
+    event.preventDefault()
+    setMessage('')
+
+    try {
+      await api.post('/api/candidate-data/skills', {
+        ...skillForm,
+        yearsOfExperience: skillForm.yearsOfExperience
+          ? Number(skillForm.yearsOfExperience)
+          : undefined,
+      })
+      setSkillForm(emptySkill)
+      await loadCandidateData()
+      setMessage('Skill added.')
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Could not add skill.')
+    }
+  }
+
+  const submitProject = async (event) => {
+    event.preventDefault()
+    setMessage('')
+
+    try {
+      await api.post('/api/candidate-data/projects', {
+        ...projectForm,
+        techStack: projectForm.techStack
+          .split(',')
+          .map((item) => item.trim())
+          .filter(Boolean),
+      })
+      setProjectForm(emptyProject)
+      await loadCandidateData()
+      setMessage('Project added.')
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Could not add project.')
+    }
+  }
+
+  return (
+    <section className="dashboard-stack">
+      <div className="dashboard-header">
+        <div>
+          <p className="eyebrow">Candidate setup</p>
+          <h2>Profile, skills, and project signals</h2>
+        </div>
+        <button className="secondary-button compact" type="button" onClick={loadCandidateData}>
+          {isLoading ? 'Refreshing' : 'Refresh'}
+        </button>
+      </div>
+
+      <div className="form-grid">
+        <form className="data-form" onSubmit={submitProfile}>
+          <h3>{profile ? 'Profile exists' : 'Create profile'}</h3>
+          <label>
+            Full name
+            <input
+              name="fullName"
+              value={profileForm.fullName}
+              onChange={updateProfileForm}
+              placeholder={profile?.full_name || 'Your full name'}
+              required
+            />
+          </label>
+          <label>
+            Headline
+            <input
+              name="headline"
+              value={profileForm.headline}
+              onChange={updateProfileForm}
+              placeholder="Full Stack Developer"
+            />
+          </label>
+          <label>
+            Location
+            <input
+              name="location"
+              value={profileForm.location}
+              onChange={updateProfileForm}
+              placeholder="India"
+            />
+          </label>
+          <label>
+            Bio
+            <textarea
+              name="bio"
+              value={profileForm.bio}
+              onChange={updateProfileForm}
+              placeholder="Short career summary"
+              rows="3"
+            />
+          </label>
+          <button className="primary-button" type="submit">
+            Save profile
+          </button>
+        </form>
+
+        <form className="data-form" onSubmit={submitSkill}>
+          <h3>Add skill</h3>
+          <label>
+            Skill
+            <input
+              name="name"
+              value={skillForm.name}
+              onChange={updateSkillForm}
+              placeholder="React"
+              required
+            />
+          </label>
+          <label>
+            Category
+            <input
+              name="category"
+              value={skillForm.category}
+              onChange={updateSkillForm}
+              placeholder="Frontend"
+            />
+          </label>
+          <label>
+            Proficiency
+            <input
+              name="proficiencyLevel"
+              value={skillForm.proficiencyLevel}
+              onChange={updateSkillForm}
+              placeholder="Intermediate"
+            />
+          </label>
+          <label>
+            Years
+            <input
+              name="yearsOfExperience"
+              type="number"
+              min="0"
+              step="0.5"
+              value={skillForm.yearsOfExperience}
+              onChange={updateSkillForm}
+              placeholder="1"
+            />
+          </label>
+          <button className="primary-button" type="submit">
+            Add skill
+          </button>
+        </form>
+
+        <form className="data-form wide" onSubmit={submitProject}>
+          <h3>Add project</h3>
+          <label>
+            Title
+            <input
+              name="title"
+              value={projectForm.title}
+              onChange={updateProjectForm}
+              placeholder="AI Resume Matcher"
+              required
+            />
+          </label>
+          <label>
+            Tech stack
+            <input
+              name="techStack"
+              value={projectForm.techStack}
+              onChange={updateProjectForm}
+              placeholder="React, Node.js, PostgreSQL"
+            />
+          </label>
+          <label>
+            Description
+            <textarea
+              name="description"
+              value={projectForm.description}
+              onChange={updateProjectForm}
+              placeholder="What the project does"
+              rows="3"
+            />
+          </label>
+          <button className="primary-button" type="submit">
+            Add project
+          </button>
+        </form>
+      </div>
+
+      <div className="summary-grid">
+        <div>
+          <h3>Skills</h3>
+          {skills.length === 0 ? (
+            <p className="muted">No skills added yet.</p>
+          ) : (
+            <div className="pill-list">
+              {skills.map((skill) => (
+                <span key={skill.id}>{skill.name}</span>
+              ))}
+            </div>
+          )}
+        </div>
+        <div>
+          <h3>Projects</h3>
+          {projects.length === 0 ? (
+            <p className="muted">No projects added yet.</p>
+          ) : (
+            <div className="record-list">
+              {projects.slice(0, 3).map((project) => (
+                <article key={project.id}>
+                  <strong>{project.title}</strong>
+                  <p>{project.description || 'No description yet.'}</p>
+                </article>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
+  )
+}
+
 function App() {
   const [mode, setMode] = useState('login')
   const [selectedRole, setSelectedRole] = useState('candidate')
@@ -213,11 +521,15 @@ function App() {
             <p className="eyebrow">{user ? user.role : selectedRole}</p>
             <h2>{activeWorkspace.title}</h2>
             <p>{activeWorkspace.summary}</p>
-            <div className="action-list">
-              {activeWorkspace.actions.map((action) => (
-                <span key={action}>{action}</span>
-              ))}
-            </div>
+            {user?.role === 'candidate' ? (
+              <CandidateDashboard setMessage={setMessage} />
+            ) : (
+              <div className="action-list">
+                {activeWorkspace.actions.map((action) => (
+                  <span key={action}>{action}</span>
+                ))}
+              </div>
+            )}
           </section>
         </div>
       </section>
