@@ -37,6 +37,12 @@ const applicationStatuses = [
   'rejected',
 ]
 
+const recruiterDocumentTypes = [
+  { label: 'Recruiter guideline', value: 'recruiter_guideline' },
+  { label: 'Job description', value: 'job_description' },
+  { label: 'Career resource', value: 'career_resource' },
+]
+
 const emptyCandidateProfile = {
   fullName: '',
   phone: '',
@@ -766,6 +772,11 @@ function RecruiterDashboard({ setMessage }) {
   const [applicants, setApplicants] = useState([])
   const [applicantMatches, setApplicantMatches] = useState([])
   const [selectedApplicantMatch, setSelectedApplicantMatch] = useState(null)
+  const [recruiterDocuments, setRecruiterDocuments] = useState([])
+  const [selectedCompanyDocumentFile, setSelectedCompanyDocumentFile] = useState(null)
+  const [companyDocumentType, setCompanyDocumentType] = useState('recruiter_guideline')
+  const [recruiterRagQuestion, setRecruiterRagQuestion] = useState('')
+  const [recruiterRagResult, setRecruiterRagResult] = useState(null)
   const [companyForm, setCompanyForm] = useState(emptyCompany)
   const [profileForm, setProfileForm] = useState(emptyRecruiterProfile)
   const [jobForm, setJobForm] = useState(emptyJob)
@@ -774,14 +785,18 @@ function RecruiterDashboard({ setMessage }) {
   const [isLoadingApplicants, setIsLoadingApplicants] = useState(false)
   const [isRankingApplicants, setIsRankingApplicants] = useState(false)
   const [matchingApplicationId, setMatchingApplicationId] = useState('')
+  const [isUploadingCompanyDocument, setIsUploadingCompanyDocument] = useState(false)
+  const [embeddingCompanyDocumentId, setEmbeddingCompanyDocumentId] = useState('')
+  const [isAskingCompanyDocuments, setIsAskingCompanyDocuments] = useState(false)
 
   const loadRecruiterData = async () => {
     setIsLoading(true)
 
     try {
-      const [profileResult, jobsResult] = await Promise.allSettled([
+      const [profileResult, jobsResult, documentsResult] = await Promise.allSettled([
         api.get('/api/profiles/recruiter/me'),
         api.get('/api/jobs/mine?page=1&limit=10'),
+        api.get('/api/documents/mine'),
       ])
 
       if (profileResult.status === 'fulfilled') {
@@ -801,6 +816,10 @@ function RecruiterDashboard({ setMessage }) {
 
       if (jobsResult.status === 'fulfilled') {
         setJobs(jobsResult.value.data.jobs)
+      }
+
+      if (documentsResult.status === 'fulfilled') {
+        setRecruiterDocuments(documentsResult.value.data.documents || [])
       }
     } finally {
       setIsLoading(false)
@@ -977,6 +996,73 @@ function RecruiterDashboard({ setMessage }) {
       setMessage('Application status updated.')
     } catch (error) {
       setMessage(error.response?.data?.message || 'Could not update application status.')
+    }
+  }
+
+  const uploadCompanyDocument = async (event) => {
+    event.preventDefault()
+    setMessage('')
+
+    if (!selectedCompanyDocumentFile) {
+      setMessage('Choose a company document first.')
+      return
+    }
+
+    const formData = new FormData()
+    formData.append('file', selectedCompanyDocumentFile)
+    formData.append('documentType', companyDocumentType)
+    setIsUploadingCompanyDocument(true)
+
+    try {
+      const { data } = await api.post('/api/documents/company', formData)
+      setSelectedCompanyDocumentFile(null)
+      setRecruiterRagResult(null)
+      await loadRecruiterData()
+      setMessage(`Company document uploaded. ${data.chunkCount || 0} text chunks created.`)
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Could not upload company document.')
+    } finally {
+      setIsUploadingCompanyDocument(false)
+    }
+  }
+
+  const embedCompanyDocument = async (documentId) => {
+    setMessage('')
+    setEmbeddingCompanyDocumentId(documentId)
+
+    try {
+      const { data } = await api.post(`/api/documents/${documentId}/chunks/embed`)
+      setMessage(`Company document prepared. ${data.embeddedChunkCount || 0} chunks embedded.`)
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Could not prepare company document.')
+    } finally {
+      setEmbeddingCompanyDocumentId('')
+    }
+  }
+
+  const askCompanyDocuments = async (event) => {
+    event.preventDefault()
+    setMessage('')
+    setRecruiterRagResult(null)
+
+    if (!recruiterRagQuestion.trim()) {
+      setMessage('Type a company document question first.')
+      return
+    }
+
+    setIsAskingCompanyDocuments(true)
+
+    try {
+      const { data } = await api.post('/api/documents/answer', {
+        question: recruiterRagQuestion,
+        limit: 5,
+      })
+      setRecruiterRagResult(data)
+      setMessage('Company document answer generated.')
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Could not answer from company documents.')
+    } finally {
+      setIsAskingCompanyDocuments(false)
     }
   }
 
@@ -1356,6 +1442,99 @@ function RecruiterDashboard({ setMessage }) {
               <p>
                 <b>Gaps:</b> {selectedApplicantMatch.missingSkills.join(', ')}
               </p>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+
+      <div className="document-panel">
+        <div className="dashboard-header">
+          <div>
+            <p className="eyebrow">Company intelligence</p>
+            <h3>Upload and query hiring documents</h3>
+          </div>
+        </div>
+
+        <form className="upload-row" onSubmit={uploadCompanyDocument}>
+          <input
+            type="file"
+            accept=".pdf,.txt,.doc,.docx"
+            onChange={(event) => setSelectedCompanyDocumentFile(event.target.files?.[0] || null)}
+          />
+          <select
+            value={companyDocumentType}
+            onChange={(event) => setCompanyDocumentType(event.target.value)}
+          >
+            {recruiterDocumentTypes.map((type) => (
+              <option key={type.value} value={type.value}>
+                {type.label}
+              </option>
+            ))}
+          </select>
+          <button
+            className="primary-button compact"
+            type="submit"
+            disabled={isUploadingCompanyDocument || !selectedCompanyDocumentFile}
+          >
+            {isUploadingCompanyDocument ? 'Uploading' : 'Upload'}
+          </button>
+        </form>
+
+        {recruiterDocuments.length === 0 ? (
+          <p className="muted">No company documents uploaded yet.</p>
+        ) : (
+          <div className="record-list">
+            {recruiterDocuments.slice(0, 5).map((document) => (
+              <article className="document-record" key={document.id}>
+                <div>
+                  <strong>{document.original_filename}</strong>
+                  <p>
+                    {document.document_type} - {Math.round((document.file_size_bytes || 0) / 1024)} KB
+                  </p>
+                </div>
+                <button
+                  className="secondary-button compact"
+                  type="button"
+                  disabled={embeddingCompanyDocumentId === document.id}
+                  onClick={() => embedCompanyDocument(document.id)}
+                >
+                  {embeddingCompanyDocumentId === document.id ? 'Preparing' : 'Prepare'}
+                </button>
+              </article>
+            ))}
+          </div>
+        )}
+
+        <form className="rag-form" onSubmit={askCompanyDocuments}>
+          <label>
+            Ask company documents
+            <textarea
+              value={recruiterRagQuestion}
+              onChange={(event) => setRecruiterRagQuestion(event.target.value)}
+              placeholder="What should interviewers focus on for this role?"
+              rows="3"
+            />
+          </label>
+          <button
+            className="primary-button compact"
+            type="submit"
+            disabled={isAskingCompanyDocuments}
+          >
+            {isAskingCompanyDocuments ? 'Asking' : 'Ask documents'}
+          </button>
+        </form>
+
+        {recruiterRagResult ? (
+          <div className="rag-result">
+            <pre className="feedback-box">{recruiterRagResult.answer}</pre>
+            {recruiterRagResult.sources?.length ? (
+              <div className="source-list">
+                {recruiterRagResult.sources.map((source) => (
+                  <span key={`${source.documentId}-${source.chunkIndex}`}>
+                    {source.sourceNumber}. {source.documentName}
+                  </span>
+                ))}
+              </div>
             ) : null}
           </div>
         ) : null}
