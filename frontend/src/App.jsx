@@ -43,6 +43,9 @@ const recruiterDocumentTypes = [
   { label: 'Career resource', value: 'career_resource' },
 ]
 
+const adminAccountStatuses = ['active', 'inactive', 'suspended']
+const adminVerificationStatuses = ['pending', 'verified']
+
 const emptyCandidateProfile = {
   fullName: '',
   phone: '',
@@ -1543,6 +1546,178 @@ function RecruiterDashboard({ setMessage }) {
   )
 }
 
+function AdminDashboard({ setMessage }) {
+  const [stats, setStats] = useState(null)
+  const [users, setUsers] = useState([])
+  const [companies, setCompanies] = useState([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [updatingUserId, setUpdatingUserId] = useState('')
+
+  const loadAdminData = async () => {
+    setIsLoading(true)
+    setMessage('')
+
+    try {
+      const [statsResult, usersResult, companiesResult] = await Promise.allSettled([
+        api.get('/api/admin/stats'),
+        api.get('/api/admin/users?page=1&limit=10'),
+        api.get('/api/admin/companies?page=1&limit=10'),
+      ])
+
+      if (statsResult.status === 'fulfilled') {
+        setStats(statsResult.value.data.stats)
+      }
+
+      if (usersResult.status === 'fulfilled') {
+        setUsers(usersResult.value.data.users || [])
+      }
+
+      if (companiesResult.status === 'fulfilled') {
+        setCompanies(companiesResult.value.data.companies || [])
+      }
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Could not load admin data.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadAdminData()
+  }, [])
+
+  const updateUserStatus = async (userId, patch) => {
+    setMessage('')
+    setUpdatingUserId(userId)
+
+    try {
+      await api.patch(`/api/admin/users/${userId}/status`, patch)
+      await loadAdminData()
+      setMessage('User status updated.')
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Could not update user status.')
+    } finally {
+      setUpdatingUserId('')
+    }
+  }
+
+  const statEntries = stats
+    ? Object.entries(stats).map(([key, value]) => ({
+        label: key.replace(/_/g, ' '),
+        value,
+      }))
+    : []
+
+  return (
+    <section className="dashboard-stack">
+      <div className="dashboard-header">
+        <div>
+          <p className="eyebrow">Admin console</p>
+          <h2>Platform health, users, and companies</h2>
+        </div>
+        <button className="secondary-button compact" type="button" onClick={loadAdminData}>
+          {isLoading ? 'Refreshing' : 'Refresh'}
+        </button>
+      </div>
+
+      <div className="admin-stat-grid">
+        {statEntries.length === 0 ? (
+          <p className="muted">No stats loaded yet.</p>
+        ) : (
+          statEntries.map((item) => (
+            <article key={item.label}>
+              <span>{item.label}</span>
+              <strong>{item.value}</strong>
+            </article>
+          ))
+        )}
+      </div>
+
+      <div className="admin-panel">
+        <div className="dashboard-header">
+          <div>
+            <p className="eyebrow">Users</p>
+            <h3>Account controls</h3>
+          </div>
+        </div>
+
+        {users.length === 0 ? (
+          <p className="muted">No users found.</p>
+        ) : (
+          <div className="record-list admin-list">
+            {users.map((adminUser) => (
+              <article key={adminUser.id}>
+                <div>
+                  <strong>{adminUser.email}</strong>
+                  <p>
+                    {adminUser.role} - {adminUser.account_status} - {adminUser.verification_status}
+                  </p>
+                </div>
+                <div className="job-actions">
+                  <select
+                    value={adminUser.account_status}
+                    disabled={updatingUserId === adminUser.id}
+                    onChange={(event) =>
+                      updateUserStatus(adminUser.id, { accountStatus: event.target.value })
+                    }
+                  >
+                    {adminAccountStatuses.map((status) => (
+                      <option key={status} value={status}>
+                        {status}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={adminUser.verification_status}
+                    disabled={updatingUserId === adminUser.id}
+                    onChange={(event) =>
+                      updateUserStatus(adminUser.id, { verificationStatus: event.target.value })
+                    }
+                  >
+                    {adminVerificationStatuses.map((status) => (
+                      <option key={status} value={status}>
+                        {status}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="admin-panel">
+        <div className="dashboard-header">
+          <div>
+            <p className="eyebrow">Companies</p>
+            <h3>Company activity</h3>
+          </div>
+        </div>
+
+        {companies.length === 0 ? (
+          <p className="muted">No companies found.</p>
+        ) : (
+          <div className="record-list admin-list">
+            {companies.map((company) => (
+              <article key={company.id}>
+                <div>
+                  <strong>{company.company_name}</strong>
+                  <p>
+                    {company.location || 'No location'} - {company.recruiter_count} recruiters -{' '}
+                    {company.job_count} jobs
+                  </p>
+                </div>
+                <span className="status-pill">{company.verification_status}</span>
+              </article>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
+  )
+}
+
 function App() {
   const [mode, setMode] = useState('login')
   const [selectedRole, setSelectedRole] = useState('candidate')
@@ -1734,6 +1909,8 @@ function App() {
               <CandidateDashboard setMessage={setMessage} />
             ) : user?.role === 'recruiter' ? (
               <RecruiterDashboard setMessage={setMessage} />
+            ) : user?.role === 'admin' ? (
+              <AdminDashboard setMessage={setMessage} />
             ) : (
               <div className="action-list">
                 {activeWorkspace.actions.map((action) => (

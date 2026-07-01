@@ -329,13 +329,41 @@ h3 {
 
 .job-browser,
 .document-panel,
-.review-panel {
+.review-panel,
+.admin-panel {
   display: grid;
   gap: 12px;
   border: 1px solid #d9e1dc;
   border-radius: 8px;
   background: #f9fbf8;
   padding: 14px;
+}
+
+.admin-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.admin-stat-grid article {
+  display: grid;
+  gap: 8px;
+  border: 1px solid #d9e1dc;
+  border-radius: 8px;
+  background: #f9fbf8;
+  padding: 14px;
+}
+
+.admin-stat-grid span {
+  color: #61716c;
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: capitalize;
+}
+
+.admin-stat-grid strong {
+  color: #15201d;
+  font-size: 26px;
 }
 
 .review-controls {
@@ -430,6 +458,22 @@ h3 {
   align-items: center;
   justify-content: space-between;
   gap: 14px;
+}
+
+.admin-list article {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.status-pill {
+  border-radius: 999px;
+  background: #e8f1ed;
+  color: #255f55;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-weight: 800;
 }
 
 .job-actions {
@@ -585,6 +629,7 @@ h3 {
 
   .form-grid,
   .summary-grid,
+  .admin-stat-grid,
   .upload-row,
   .review-controls,
   .two-column-fields {
@@ -597,6 +642,7 @@ h3 {
 
   .job-list article,
   .applicant-list article,
+  .admin-list article,
   .document-record,
   .recommendation-list article,
   .job-actions,
