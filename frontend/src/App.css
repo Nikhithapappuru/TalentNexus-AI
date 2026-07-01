@@ -125,7 +125,8 @@ h2 {
 
 button,
 input,
-textarea {
+textarea,
+select {
   font: inherit;
 }
 
@@ -156,7 +157,8 @@ label {
 }
 
 input,
-textarea {
+textarea,
+select {
   width: 100%;
   border: 1px solid #cfd8d2;
   border-radius: 7px;
@@ -168,7 +170,8 @@ textarea {
 }
 
 input:focus,
-textarea:focus {
+textarea:focus,
+select:focus {
   border-color: #2e7d69;
   box-shadow: 0 0 0 3px rgba(46, 125, 105, 0.14);
 }
@@ -288,6 +291,24 @@ textarea:focus {
   grid-column: 1 / -1;
 }
 
+.two-column-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.checkbox-row {
+  display: flex;
+  grid-template-columns: none;
+  align-items: center;
+  gap: 10px;
+}
+
+.checkbox-row input {
+  width: 18px;
+  height: 18px;
+}
+
 h3 {
   margin: 0;
   color: #15201d;
@@ -373,7 +394,8 @@ h3 {
   }
 
   .form-grid,
-  .summary-grid {
+  .summary-grid,
+  .two-column-fields {
     grid-template-columns: 1fr;
   }
 

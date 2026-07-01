@@ -47,6 +47,39 @@ const emptyProject = {
   techStack: '',
 }
 
+const emptyCompany = {
+  companyName: '',
+  description: '',
+  website: '',
+  location: '',
+}
+
+const emptyRecruiterProfile = {
+  fullName: '',
+  designation: '',
+  companyId: '',
+}
+
+const emptyJob = {
+  title: '',
+  description: '',
+  experienceRequired: '',
+  minimumSalary: '',
+  maximumSalary: '',
+  employmentType: 'internship',
+  workMode: 'remote',
+  location: '',
+  applicationDeadline: '',
+}
+
+const emptyJobSkill = {
+  jobId: '',
+  name: '',
+  category: '',
+  isRequired: true,
+  weight: '1',
+}
+
 function CandidateDashboard({ setMessage }) {
   const [profile, setProfile] = useState(null)
   const [skills, setSkills] = useState([])
@@ -334,6 +367,418 @@ function CandidateDashboard({ setMessage }) {
   )
 }
 
+function RecruiterDashboard({ setMessage }) {
+  const [company, setCompany] = useState(null)
+  const [profile, setProfile] = useState(null)
+  const [jobs, setJobs] = useState([])
+  const [companyForm, setCompanyForm] = useState(emptyCompany)
+  const [profileForm, setProfileForm] = useState(emptyRecruiterProfile)
+  const [jobForm, setJobForm] = useState(emptyJob)
+  const [jobSkillForm, setJobSkillForm] = useState(emptyJobSkill)
+  const [isLoading, setIsLoading] = useState(false)
+
+  const loadRecruiterData = async () => {
+    setIsLoading(true)
+
+    try {
+      const [profileResult, jobsResult] = await Promise.allSettled([
+        api.get('/api/profiles/recruiter/me'),
+        api.get('/api/jobs/mine?page=1&limit=10'),
+      ])
+
+      if (profileResult.status === 'fulfilled') {
+        const recruiterProfile = profileResult.value.data.profile
+        setProfile(recruiterProfile)
+        setProfileForm((current) => ({
+          ...current,
+          companyId: recruiterProfile.company_id || current.companyId,
+        }))
+        if (recruiterProfile.company_id) {
+          setCompany({
+            id: recruiterProfile.company_id,
+            company_name: recruiterProfile.company_name,
+          })
+        }
+      }
+
+      if (jobsResult.status === 'fulfilled') {
+        setJobs(jobsResult.value.data.jobs)
+      }
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadRecruiterData()
+  }, [])
+
+  const updateCompanyForm = (event) => {
+    setCompanyForm((current) => ({
+      ...current,
+      [event.target.name]: event.target.value,
+    }))
+  }
+
+  const updateProfileForm = (event) => {
+    setProfileForm((current) => ({
+      ...current,
+      [event.target.name]: event.target.value,
+    }))
+  }
+
+  const updateJobForm = (event) => {
+    setJobForm((current) => ({
+      ...current,
+      [event.target.name]: event.target.value,
+    }))
+  }
+
+  const updateJobSkillForm = (event) => {
+    const { name, value, type, checked } = event.target
+    setJobSkillForm((current) => ({
+      ...current,
+      [name]: type === 'checkbox' ? checked : value,
+    }))
+  }
+
+  const submitCompany = async (event) => {
+    event.preventDefault()
+    setMessage('')
+
+    try {
+      const { data } = await api.post('/api/profiles/companies', companyForm)
+      setCompany(data.company)
+      setProfileForm((current) => ({
+        ...current,
+        companyId: data.company.id,
+      }))
+      setMessage('Company created.')
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Could not create company.')
+    }
+  }
+
+  const submitRecruiterProfile = async (event) => {
+    event.preventDefault()
+    setMessage('')
+
+    try {
+      const { data } = await api.post('/api/profiles/recruiter', profileForm)
+      setProfile(data.profile)
+      setMessage('Recruiter profile saved.')
+      await loadRecruiterData()
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Could not save recruiter profile.')
+    }
+  }
+
+  const submitJob = async (event) => {
+    event.preventDefault()
+    setMessage('')
+
+    try {
+      await api.post('/api/jobs', {
+        ...jobForm,
+        experienceRequired: Number(jobForm.experienceRequired || 0),
+        minimumSalary: jobForm.minimumSalary ? Number(jobForm.minimumSalary) : undefined,
+        maximumSalary: jobForm.maximumSalary ? Number(jobForm.maximumSalary) : undefined,
+      })
+      setJobForm(emptyJob)
+      await loadRecruiterData()
+      setMessage('Job posted.')
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Could not post job.')
+    }
+  }
+
+  const submitJobSkill = async (event) => {
+    event.preventDefault()
+    setMessage('')
+
+    try {
+      await api.post(`/api/jobs/${jobSkillForm.jobId}/skills`, {
+        name: jobSkillForm.name,
+        category: jobSkillForm.category,
+        isRequired: jobSkillForm.isRequired,
+        weight: Number(jobSkillForm.weight || 1),
+      })
+      setJobSkillForm(emptyJobSkill)
+      setMessage('Job skill added.')
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Could not add job skill.')
+    }
+  }
+
+  return (
+    <section className="dashboard-stack">
+      <div className="dashboard-header">
+        <div>
+          <p className="eyebrow">Recruiter setup</p>
+          <h2>Company, profile, jobs, and skill requirements</h2>
+        </div>
+        <button className="secondary-button compact" type="button" onClick={loadRecruiterData}>
+          {isLoading ? 'Refreshing' : 'Refresh'}
+        </button>
+      </div>
+
+      <div className="form-grid">
+        <form className="data-form" onSubmit={submitCompany}>
+          <h3>{company ? 'Company linked' : 'Create company'}</h3>
+          <label>
+            Company name
+            <input
+              name="companyName"
+              value={companyForm.companyName}
+              onChange={updateCompanyForm}
+              placeholder={company?.company_name || 'TalentNexus Labs'}
+              required
+            />
+          </label>
+          <label>
+            Website
+            <input
+              name="website"
+              value={companyForm.website}
+              onChange={updateCompanyForm}
+              placeholder="https://example.com"
+            />
+          </label>
+          <label>
+            Location
+            <input
+              name="location"
+              value={companyForm.location}
+              onChange={updateCompanyForm}
+              placeholder="Remote"
+            />
+          </label>
+          <label>
+            Description
+            <textarea
+              name="description"
+              value={companyForm.description}
+              onChange={updateCompanyForm}
+              placeholder="What your company does"
+              rows="3"
+            />
+          </label>
+          <button className="primary-button" type="submit">
+            Create company
+          </button>
+        </form>
+
+        <form className="data-form" onSubmit={submitRecruiterProfile}>
+          <h3>{profile ? 'Recruiter profile exists' : 'Create recruiter profile'}</h3>
+          <label>
+            Full name
+            <input
+              name="fullName"
+              value={profileForm.fullName}
+              onChange={updateProfileForm}
+              placeholder={profile?.full_name || 'Recruiter name'}
+              required
+            />
+          </label>
+          <label>
+            Designation
+            <input
+              name="designation"
+              value={profileForm.designation}
+              onChange={updateProfileForm}
+              placeholder="HR Manager"
+            />
+          </label>
+          <label>
+            Company ID
+            <input
+              name="companyId"
+              value={profileForm.companyId}
+              onChange={updateProfileForm}
+              placeholder="Created company id"
+            />
+          </label>
+          <button className="primary-button" type="submit">
+            Save recruiter profile
+          </button>
+        </form>
+
+        <form className="data-form wide" onSubmit={submitJob}>
+          <h3>Post job</h3>
+          <div className="two-column-fields">
+            <label>
+              Title
+              <input
+                name="title"
+                value={jobForm.title}
+                onChange={updateJobForm}
+                placeholder="Full Stack Developer Intern"
+                required
+              />
+            </label>
+            <label>
+              Location
+              <input
+                name="location"
+                value={jobForm.location}
+                onChange={updateJobForm}
+                placeholder="India"
+              />
+            </label>
+            <label>
+              Employment type
+              <select
+                name="employmentType"
+                value={jobForm.employmentType}
+                onChange={updateJobForm}
+              >
+                <option value="internship">Internship</option>
+                <option value="full_time">Full time</option>
+                <option value="part_time">Part time</option>
+                <option value="contract">Contract</option>
+              </select>
+            </label>
+            <label>
+              Work mode
+              <select name="workMode" value={jobForm.workMode} onChange={updateJobForm}>
+                <option value="remote">Remote</option>
+                <option value="hybrid">Hybrid</option>
+                <option value="onsite">Onsite</option>
+              </select>
+            </label>
+            <label>
+              Experience years
+              <input
+                name="experienceRequired"
+                type="number"
+                min="0"
+                value={jobForm.experienceRequired}
+                onChange={updateJobForm}
+                placeholder="0"
+              />
+            </label>
+            <label>
+              Deadline
+              <input
+                name="applicationDeadline"
+                type="date"
+                value={jobForm.applicationDeadline}
+                onChange={updateJobForm}
+              />
+            </label>
+          </div>
+          <label>
+            Description
+            <textarea
+              name="description"
+              value={jobForm.description}
+              onChange={updateJobForm}
+              placeholder="Role responsibilities and requirements"
+              rows="4"
+              required
+            />
+          </label>
+          <button className="primary-button" type="submit">
+            Post job
+          </button>
+        </form>
+
+        <form className="data-form wide" onSubmit={submitJobSkill}>
+          <h3>Add job skill</h3>
+          <div className="two-column-fields">
+            <label>
+              Job
+              <select
+                name="jobId"
+                value={jobSkillForm.jobId}
+                onChange={updateJobSkillForm}
+                required
+              >
+                <option value="">Select job</option>
+                {jobs.map((job) => (
+                  <option key={job.id} value={job.id}>
+                    {job.title}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Skill
+              <input
+                name="name"
+                value={jobSkillForm.name}
+                onChange={updateJobSkillForm}
+                placeholder="React"
+                required
+              />
+            </label>
+            <label>
+              Category
+              <input
+                name="category"
+                value={jobSkillForm.category}
+                onChange={updateJobSkillForm}
+                placeholder="Frontend"
+              />
+            </label>
+            <label>
+              Weight
+              <input
+                name="weight"
+                type="number"
+                min="0"
+                step="0.1"
+                value={jobSkillForm.weight}
+                onChange={updateJobSkillForm}
+              />
+            </label>
+          </div>
+          <label className="checkbox-row">
+            <input
+              name="isRequired"
+              type="checkbox"
+              checked={jobSkillForm.isRequired}
+              onChange={updateJobSkillForm}
+            />
+            Required skill
+          </label>
+          <button className="primary-button" type="submit">
+            Add job skill
+          </button>
+        </form>
+      </div>
+
+      <div className="summary-grid">
+        <div>
+          <h3>Posted jobs</h3>
+          {jobs.length === 0 ? (
+            <p className="muted">No jobs posted yet.</p>
+          ) : (
+            <div className="record-list">
+              {jobs.slice(0, 4).map((job) => (
+                <article key={job.id}>
+                  <strong>{job.title}</strong>
+                  <p>
+                    {job.company_name} · {job.employment_type} · {job.work_mode}
+                  </p>
+                </article>
+              ))}
+            </div>
+          )}
+        </div>
+        <div>
+          <h3>Current company</h3>
+          {company ? (
+            <p className="muted">{company.company_name || company.companyName}</p>
+          ) : (
+            <p className="muted">Create a company before posting jobs.</p>
+          )}
+        </div>
+      </div>
+    </section>
+  )
+}
+
 function App() {
   const [mode, setMode] = useState('login')
   const [selectedRole, setSelectedRole] = useState('candidate')
@@ -523,6 +968,8 @@ function App() {
             <p>{activeWorkspace.summary}</p>
             {user?.role === 'candidate' ? (
               <CandidateDashboard setMessage={setMessage} />
+            ) : user?.role === 'recruiter' ? (
+              <RecruiterDashboard setMessage={setMessage} />
             ) : (
               <div className="action-list">
                 {activeWorkspace.actions.map((action) => (
