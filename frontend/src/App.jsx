@@ -92,6 +92,8 @@ function CandidateDashboard({ setMessage }) {
   const [selectedSkillGap, setSelectedSkillGap] = useState(null)
   const [selectedResumeFile, setSelectedResumeFile] = useState(null)
   const [resumeFeedback, setResumeFeedback] = useState('')
+  const [ragQuestion, setRagQuestion] = useState('')
+  const [ragResult, setRagResult] = useState(null)
   const [profileForm, setProfileForm] = useState(emptyCandidateProfile)
   const [skillForm, setSkillForm] = useState(emptySkill)
   const [projectForm, setProjectForm] = useState(emptyProject)
@@ -100,6 +102,8 @@ function CandidateDashboard({ setMessage }) {
   const [isGeneratingFeedback, setIsGeneratingFeedback] = useState(false)
   const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(false)
   const [isGeneratingGap, setIsGeneratingGap] = useState(false)
+  const [embeddingDocumentId, setEmbeddingDocumentId] = useState('')
+  const [isAskingDocuments, setIsAskingDocuments] = useState(false)
 
   const appliedJobIds = useMemo(
     () => new Set(applications.map((application) => application.job_id || application.jobId)),
@@ -329,6 +333,46 @@ function CandidateDashboard({ setMessage }) {
     }
   }
 
+  const embedDocument = async (documentId) => {
+    setMessage('')
+    setEmbeddingDocumentId(documentId)
+
+    try {
+      const { data } = await api.post(`/api/documents/${documentId}/chunks/embed`)
+      setMessage(`Document prepared for Q&A. ${data.embeddedChunkCount || 0} chunks embedded.`)
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Could not prepare document for Q&A.')
+    } finally {
+      setEmbeddingDocumentId('')
+    }
+  }
+
+  const askDocuments = async (event) => {
+    event.preventDefault()
+    setMessage('')
+    setRagResult(null)
+
+    if (!ragQuestion.trim()) {
+      setMessage('Type a question first.')
+      return
+    }
+
+    setIsAskingDocuments(true)
+
+    try {
+      const { data } = await api.post('/api/documents/answer', {
+        question: ragQuestion,
+        limit: 5,
+      })
+      setRagResult(data)
+      setMessage('Document answer generated.')
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Could not answer from documents.')
+    } finally {
+      setIsAskingDocuments(false)
+    }
+  }
+
   return (
     <section className="dashboard-stack">
       <div className="dashboard-header">
@@ -537,17 +581,57 @@ function CandidateDashboard({ setMessage }) {
         ) : (
           <div className="record-list">
             {documents.slice(0, 4).map((document) => (
-              <article key={document.id}>
-                <strong>{document.original_filename}</strong>
-                <p>
-                  {document.document_type} - {Math.round((document.file_size_bytes || 0) / 1024)} KB
-                </p>
+              <article className="document-record" key={document.id}>
+                <div>
+                  <strong>{document.original_filename}</strong>
+                  <p>
+                    {document.document_type} - {Math.round((document.file_size_bytes || 0) / 1024)} KB
+                  </p>
+                </div>
+                <button
+                  className="secondary-button compact"
+                  type="button"
+                  disabled={embeddingDocumentId === document.id}
+                  onClick={() => embedDocument(document.id)}
+                >
+                  {embeddingDocumentId === document.id ? 'Preparing' : 'Prepare'}
+                </button>
               </article>
             ))}
           </div>
         )}
 
         {resumeFeedback ? <pre className="feedback-box">{resumeFeedback}</pre> : null}
+
+        <form className="rag-form" onSubmit={askDocuments}>
+          <label>
+            Ask your documents
+            <textarea
+              value={ragQuestion}
+              onChange={(event) => setRagQuestion(event.target.value)}
+              placeholder="What skills should I highlight from my resume?"
+              rows="3"
+            />
+          </label>
+          <button className="primary-button compact" type="submit" disabled={isAskingDocuments}>
+            {isAskingDocuments ? 'Asking' : 'Ask documents'}
+          </button>
+        </form>
+
+        {ragResult ? (
+          <div className="rag-result">
+            <pre className="feedback-box">{ragResult.answer}</pre>
+            {ragResult.sources?.length ? (
+              <div className="source-list">
+                {ragResult.sources.map((source) => (
+                  <span key={`${source.documentId}-${source.chunkIndex}`}>
+                    {source.sourceNumber}. {source.documentName}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       <div className="job-browser">
