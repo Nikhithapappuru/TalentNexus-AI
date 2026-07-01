@@ -86,7 +86,7 @@ ${resume.extracted_text.slice(0, 12000)}`;
       feedback,
     });
   } catch (error) {
-    return res.status(500).json({
+    return res.status(error.statusCode || 500).json({
       status: "error",
       message: error.message,
     });
@@ -141,7 +141,7 @@ Focus on missing skills, project ideas, and what to learn first.`;
       guidance,
     });
   } catch (error) {
-    return res.status(500).json({
+    return res.status(error.statusCode || 500).json({
       status: "error",
       message: error.message,
     });
@@ -188,7 +188,7 @@ const getJobRecommendations = async (req, res) => {
       recommendations: recommendations.slice(0, limit),
     });
   } catch (error) {
-    return res.status(500).json({
+    return res.status(error.statusCode || 500).json({
       status: "error",
       message: error.message,
     });

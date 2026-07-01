@@ -1,14 +1,19 @@
 const getGeminiClient = require("./geminiClient");
+const { normalizeAiProviderError } = require("../utils/aiProviderError");
 
-const GENERATION_MODEL = process.env.GEMINI_GENERATION_MODEL || "gemini-2.0-flash";
+const GENERATION_MODEL = process.env.GEMINI_GENERATION_MODEL || "gemini-2.5-flash-lite";
 
 const generateText = async (prompt) => {
-  const response = await getGeminiClient().models.generateContent({
-    model: GENERATION_MODEL,
-    contents: prompt,
-  });
+  try {
+    const response = await getGeminiClient().models.generateContent({
+      model: GENERATION_MODEL,
+      contents: prompt,
+    });
 
-  return response.text || "";
+    return response.text || "";
+  } catch (error) {
+    throw normalizeAiProviderError(error);
+  }
 };
 
 const generateGroundedAnswer = async ({ question, chunks }) => {

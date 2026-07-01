@@ -107,5 +107,8 @@ npm.cmd run build
 
 - If document Q&A says no embedded chunks were found, click `Prepare` on the document first.
 - If resume feedback fails, confirm `GEMINI_API_KEY` is set in `backend/.env`.
+- If embeddings fail with `models/text-embedding-004 is not found`, set `GEMINI_EMBEDDING_MODEL=gemini-embedding-001` and restart the backend.
+- If AI actions fail with `429 RESOURCE_EXHAUSTED`, your Gemini project has hit its current quota. Wait for the retry window, reduce repeated AI requests, or check billing/rate limits in Google AI Studio.
+- If AI actions fail with `503 UNAVAILABLE` or high demand, retry after a short wait or temporarily use another available generation model.
 - If uploads fail with `Field name missing`, the multipart file key must be `file`.
 - If pgvector fails during setup, install the `vector` extension for the PostgreSQL server you are actually running.

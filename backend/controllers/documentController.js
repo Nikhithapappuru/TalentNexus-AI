@@ -128,7 +128,7 @@ const uploadResume = async (req, res) => {
       chunkCount: chunks.length,
     });
   } catch (error) {
-    return res.status(500).json({
+    return res.status(error.statusCode || 500).json({
       status: "error",
       message: error.message,
     });
@@ -182,7 +182,7 @@ const uploadCompanyDocument = async (req, res) => {
       chunkCount: chunks.length,
     });
   } catch (error) {
-    return res.status(500).json({
+    return res.status(error.statusCode || 500).json({
       status: "error",
       message: error.message,
     });
@@ -206,7 +206,7 @@ const getMyDocuments = async (req, res) => {
       documents: result.rows,
     });
   } catch (error) {
-    return res.status(500).json({
+    return res.status(error.statusCode || 500).json({
       status: "error",
       message: error.message,
     });
@@ -236,7 +236,7 @@ const getDocumentById = async (req, res) => {
       document: result.rows[0],
     });
   } catch (error) {
-    return res.status(500).json({
+    return res.status(error.statusCode || 500).json({
       status: "error",
       message: error.message,
     });
@@ -271,7 +271,7 @@ const getDocumentChunks = async (req, res) => {
       chunks: result.rows,
     });
   } catch (error) {
-    return res.status(500).json({
+    return res.status(error.statusCode || 500).json({
       status: "error",
       message: error.message,
     });
@@ -306,7 +306,7 @@ const regenerateDocumentChunks = async (req, res) => {
       chunks,
     });
   } catch (error) {
-    return res.status(500).json({
+    return res.status(error.statusCode || 500).json({
       status: "error",
       message: error.message,
     });
@@ -368,7 +368,7 @@ const embedDocumentChunks = async (req, res) => {
       dimensions: EMBEDDING_DIMENSIONS,
     });
   } catch (error) {
-    return res.status(500).json({
+    return res.status(error.statusCode || 500).json({
       status: "error",
       message: error.message,
     });
@@ -450,7 +450,7 @@ const searchDocumentChunks = async (req, res) => {
       results: result.rows,
     });
   } catch (error) {
-    return res.status(500).json({
+    return res.status(error.statusCode || 500).json({
       status: "error",
       message: error.message,
     });
@@ -555,7 +555,7 @@ const answerFromDocuments = async (req, res) => {
       },
     });
   } catch (error) {
-    return res.status(500).json({
+    return res.status(error.statusCode || 500).json({
       status: "error",
       message: error.message,
     });
