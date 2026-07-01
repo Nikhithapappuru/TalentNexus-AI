@@ -328,13 +328,21 @@ h3 {
 }
 
 .job-browser,
-.document-panel {
+.document-panel,
+.review-panel {
   display: grid;
   gap: 12px;
   border: 1px solid #d9e1dc;
   border-radius: 8px;
   background: #f9fbf8;
   padding: 14px;
+}
+
+.review-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
 }
 
 .upload-row {
@@ -411,6 +419,13 @@ h3 {
 }
 
 .job-list article {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.applicant-list article {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -571,6 +586,7 @@ h3 {
   .form-grid,
   .summary-grid,
   .upload-row,
+  .review-controls,
   .two-column-fields {
     grid-template-columns: 1fr;
   }
@@ -580,6 +596,7 @@ h3 {
   }
 
   .job-list article,
+  .applicant-list article,
   .document-record,
   .recommendation-list article,
   .job-actions,

@@ -26,6 +26,17 @@ const workspaceCopy = {
   },
 }
 
+const applicationStatuses = [
+  'applied',
+  'reviewing',
+  'shortlisted',
+  'interview_scheduled',
+  'interview_completed',
+  'offer_extended',
+  'accepted',
+  'rejected',
+]
+
 const emptyCandidateProfile = {
   fullName: '',
   phone: '',
@@ -751,11 +762,18 @@ function RecruiterDashboard({ setMessage }) {
   const [company, setCompany] = useState(null)
   const [profile, setProfile] = useState(null)
   const [jobs, setJobs] = useState([])
+  const [selectedReviewJobId, setSelectedReviewJobId] = useState('')
+  const [applicants, setApplicants] = useState([])
+  const [applicantMatches, setApplicantMatches] = useState([])
+  const [selectedApplicantMatch, setSelectedApplicantMatch] = useState(null)
   const [companyForm, setCompanyForm] = useState(emptyCompany)
   const [profileForm, setProfileForm] = useState(emptyRecruiterProfile)
   const [jobForm, setJobForm] = useState(emptyJob)
   const [jobSkillForm, setJobSkillForm] = useState(emptyJobSkill)
   const [isLoading, setIsLoading] = useState(false)
+  const [isLoadingApplicants, setIsLoadingApplicants] = useState(false)
+  const [isRankingApplicants, setIsRankingApplicants] = useState(false)
+  const [matchingApplicationId, setMatchingApplicationId] = useState('')
 
   const loadRecruiterData = async () => {
     setIsLoading(true)
@@ -887,6 +905,78 @@ function RecruiterDashboard({ setMessage }) {
       setMessage('Job skill added.')
     } catch (error) {
       setMessage(error.response?.data?.message || 'Could not add job skill.')
+    }
+  }
+
+  const loadApplicants = async (jobId = selectedReviewJobId) => {
+    setMessage('')
+    setSelectedApplicantMatch(null)
+
+    if (!jobId) {
+      setMessage('Select a job first.')
+      return
+    }
+
+    setSelectedReviewJobId(jobId)
+    setIsLoadingApplicants(true)
+
+    try {
+      const { data } = await api.get(`/api/applications/jobs/${jobId}/applicants`)
+      setApplicants(data.applicants || [])
+      setMessage('Applicants loaded.')
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Could not load applicants.')
+    } finally {
+      setIsLoadingApplicants(false)
+    }
+  }
+
+  const rankApplicants = async () => {
+    setMessage('')
+
+    if (!selectedReviewJobId) {
+      setMessage('Select a job first.')
+      return
+    }
+
+    setIsRankingApplicants(true)
+
+    try {
+      const { data } = await api.get(`/api/matches/jobs/${selectedReviewJobId}/applicants`)
+      setApplicantMatches(data.matches || [])
+      setMessage('Applicant ranking loaded.')
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Could not rank applicants.')
+    } finally {
+      setIsRankingApplicants(false)
+    }
+  }
+
+  const viewApplicantMatch = async (applicationId) => {
+    setMessage('')
+    setSelectedApplicantMatch(null)
+    setMatchingApplicationId(applicationId)
+
+    try {
+      const { data } = await api.get(`/api/matches/applications/${applicationId}`)
+      setSelectedApplicantMatch(data.match)
+      setMessage('Applicant match calculated.')
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Could not calculate applicant match.')
+    } finally {
+      setMatchingApplicationId('')
+    }
+  }
+
+  const updateApplicantStatus = async (applicationId, status) => {
+    setMessage('')
+
+    try {
+      await api.patch(`/api/applications/${applicationId}/status`, { status })
+      await loadApplicants(selectedReviewJobId)
+      setMessage('Application status updated.')
+    } catch (error) {
+      setMessage(error.response?.data?.message || 'Could not update application status.')
     }
   }
 
@@ -1139,7 +1229,7 @@ function RecruiterDashboard({ setMessage }) {
                 <article key={job.id}>
                   <strong>{job.title}</strong>
                   <p>
-                    {job.company_name} · {job.employment_type} · {job.work_mode}
+                    {job.company_name} - {job.employment_type} - {job.work_mode}
                   </p>
                 </article>
               ))}
@@ -1154,6 +1244,121 @@ function RecruiterDashboard({ setMessage }) {
             <p className="muted">Create a company before posting jobs.</p>
           )}
         </div>
+      </div>
+
+      <div className="review-panel">
+        <div className="dashboard-header">
+          <div>
+            <p className="eyebrow">Applicant review</p>
+            <h3>Review candidates by job</h3>
+          </div>
+          <button
+            className="secondary-button compact"
+            type="button"
+            onClick={rankApplicants}
+            disabled={isRankingApplicants || !selectedReviewJobId}
+          >
+            {isRankingApplicants ? 'Ranking' : 'Rank applicants'}
+          </button>
+        </div>
+
+        <div className="review-controls">
+          <select
+            value={selectedReviewJobId}
+            onChange={(event) => {
+              setSelectedReviewJobId(event.target.value)
+              setApplicants([])
+              setApplicantMatches([])
+              setSelectedApplicantMatch(null)
+            }}
+          >
+            <option value="">Select job</option>
+            {jobs.map((job) => (
+              <option key={job.id} value={job.id}>
+                {job.title}
+              </option>
+            ))}
+          </select>
+          <button
+            className="primary-button compact"
+            type="button"
+            onClick={() => loadApplicants()}
+            disabled={isLoadingApplicants || !selectedReviewJobId}
+          >
+            {isLoadingApplicants ? 'Loading' : 'Load applicants'}
+          </button>
+        </div>
+
+        {applicantMatches.length ? (
+          <div className="recommendation-list">
+            {applicantMatches.map((item) => (
+              <article key={item.applicationId}>
+                <div>
+                  <strong>{item.candidateName}</strong>
+                  <p>{item.match?.explanation || 'No explanation yet.'}</p>
+                </div>
+                <span>{Math.round(Number(item.match?.score || 0))}%</span>
+              </article>
+            ))}
+          </div>
+        ) : null}
+
+        {applicants.length === 0 ? (
+          <p className="muted">No applicants loaded yet.</p>
+        ) : (
+          <div className="record-list applicant-list">
+            {applicants.map((applicant) => (
+              <article key={applicant.id}>
+                <div>
+                  <strong>{applicant.full_name}</strong>
+                  <p>
+                    {applicant.headline || applicant.email} - {applicant.location || applicant.status}
+                  </p>
+                </div>
+                <div className="job-actions">
+                  <select
+                    value={applicant.status}
+                    onChange={(event) => updateApplicantStatus(applicant.id, event.target.value)}
+                  >
+                    {applicationStatuses.map((status) => (
+                      <option key={status} value={status}>
+                        {status}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    className="secondary-button compact"
+                    type="button"
+                    disabled={matchingApplicationId === applicant.id}
+                    onClick={() => viewApplicantMatch(applicant.id)}
+                  >
+                    {matchingApplicationId === applicant.id ? 'Scoring' : 'View match'}
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+
+        {selectedApplicantMatch ? (
+          <div className="score-panel">
+            <div>
+              <span>Applicant score</span>
+              <strong>{Math.round(Number(selectedApplicantMatch.score || 0))}%</strong>
+            </div>
+            <p>{selectedApplicantMatch.explanation || 'No explanation yet.'}</p>
+            {selectedApplicantMatch.matchedSkills?.length ? (
+              <p>
+                <b>Matched:</b> {selectedApplicantMatch.matchedSkills.join(', ')}
+              </p>
+            ) : null}
+            {selectedApplicantMatch.missingSkills?.length ? (
+              <p>
+                <b>Gaps:</b> {selectedApplicantMatch.missingSkills.join(', ')}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </section>
   )
